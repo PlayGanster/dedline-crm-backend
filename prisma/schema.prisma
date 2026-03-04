@@ -1,0 +1,527 @@
+// Prisma schema for Dedline CRM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  password     String
+  first_name   String
+  last_name    String
+  role         UserRole @default(MANAGER)
+  avatar       String?
+  phone        String?
+  secret_code  String?  @unique
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  logs         Log[]
+  client_notes ClientNote[]
+  client_documents ClientDocument[]
+  verified_documents ClientDocument[] @relation("VerifiedDocuments")
+  performer_notes PerformerNote[]
+  performer_documents PerformerDocument[]
+  verified_performer_documents PerformerDocument[] @relation("PerformerVerifiedDocuments")
+  incoming_calls IncomingCall[]
+  chats_user1  Chat[] @relation("ChatUser1")
+  chats_user2  Chat[] @relation("ChatUser2")
+  messages     Message[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  MANAGER
+  CHIEF_MANAGER
+  ACCOUNTANT
+  HEAD_OF_MANAGERS
+  DIRECTOR
+  LEGAL
+  DEV
+}
+
+model ResetPasswordToken {
+  id         Int      @id @default(autoincrement())
+  email      String
+  code       String
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@map("reset_password_tokens")
+}
+
+model Log {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String
+  entity      String?
+  entityId    Int?
+  description String
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@map("logs")
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum ClientType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+model Client {
+  id              Int         @id @default(autoincrement())
+  type            ClientType
+  email           String?
+  phone           String?
+  
+  // Fields for individual (fiz. litso)
+  first_name      String?
+  last_name       String?
+  middle_name     String?
+  passport_series String?
+  passport_number String?
+  
+  // Fields for legal entity (yur. litso)
+  company_name    String?
+  inn             String?
+  kpp             String?
+  ogrn            String?
+  legal_address   String?
+  
+  notes           String?
+  is_active       Boolean     @default(true)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  notes_list      ClientNote[]
+  documents       ClientDocument[]
+  encrypted_data  ClientEncryptedData[]
+  applications    Application[]
+  incoming_calls  IncomingCall[]
+  transactions    Transaction[]
+  invoices        Invoice[]
+  acts            Act[]
+
+  @@map("clients")
+  @@index([type])
+  @@index([email])
+  @@index([inn])
+}
+
+model ClientNote {
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("client_notes")
+  @@index([clientId])
+  @@index([userId])
+}
+
+model ClientDocument {
+  id          Int      @id @default(autoincrement())
+  clientId    Int
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  encryptedPath String
+  description String?
+  is_verified Boolean  @default(false)
+  verified_by Int?
+  verifiedBy  User?    @relation("VerifiedDocuments", fields: [verified_by], references: [id], onDelete: SetNull)
+  verified_at DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("client_documents")
+  @@index([clientId])
+  @@index([userId])
+  @@index([is_verified])
+}
+
+model ClientEncryptedData {
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fieldType  String
+  encryptedValue String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("client_encrypted_data")
+  @@index([clientId])
+  @@index([fieldType])
+}
+
+enum SourceType {
+  CRM
+  APP
+}
+
+model Performer {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  password        String?  // Только для APP пользователей
+  phone           String   @unique
+  first_name      String
+  last_name       String
+  middle_name     String?
+  avatar          String?
+  source          SourceType @default(CRM)
+  is_verified     Boolean  @default(false)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  notes           PerformerNote[]
+  documents       PerformerDocument[]
+  encrypted_data  PerformerEncryptedData[]
+  professions     PerformerProfession[]
+  applications    ApplicationPerformer[]
+  transactions    Transaction[]
+
+  @@map("performers")
+  @@index([email])
+  @@index([phone])
+  @@index([source])
+}
+
+model PerformerProfession {
+  id          Int      @id @default(autoincrement())
+  performerId Int
+  performer   Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  name        String
+  created_at  DateTime @default(now())
+
+  @@map("performer_professions")
+  @@index([performerId])
+}
+
+model PerformerNote {
+  id         Int      @id @default(autoincrement())
+  performerId Int
+  performer  Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("performer_notes")
+  @@index([performerId])
+  @@index([userId])
+}
+
+model PerformerDocument {
+  id          Int      @id @default(autoincrement())
+  performerId Int
+  performer   Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  encryptedPath String
+  description String?
+  is_verified Boolean  @default(false)
+  verified_by Int?
+  verifiedBy  User?    @relation("PerformerVerifiedDocuments", fields: [verified_by], references: [id], onDelete: SetNull)
+  verified_at DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("performer_documents")
+  @@index([performerId])
+  @@index([userId])
+  @@index([is_verified])
+}
+
+model PerformerEncryptedData {
+  id         Int      @id @default(autoincrement())
+  performerId Int
+  performer  Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  fieldType  String   // passport_series, passport_number, etc.
+  encryptedValue String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("performer_encrypted_data")
+  @@index([performerId])
+  @@index([fieldType])
+}
+
+enum ApplicationStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Application {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  client_id   Int
+  client      Client   @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  status      ApplicationStatus @default(NEW)
+  amount      Decimal? @db.Decimal(10, 2)
+  performers_count Int @default(1)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  performers ApplicationPerformer[]
+  incoming_calls IncomingCall[]
+  transactions Transaction[]
+  invoices Invoice[]
+  acts Act[]
+
+  @@map("applications")
+  @@index([client_id])
+  @@index([status])
+}
+
+model ApplicationPerformer {
+  id            Int      @id @default(autoincrement())
+  applicationId Int
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  performerId   Int
+  performer     Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  assigned_at   DateTime @default(now())
+
+  @@unique([applicationId, performerId])
+  @@map("application_performers")
+  @@index([applicationId])
+  @@index([performerId])
+}
+
+model IncomingCall {
+  id            Int      @id @default(autoincrement())
+  phone         String
+  caller_name   String?
+  crm_user_id   Int?
+  crm_user      User?    @relation(fields: [crm_user_id], references: [id], onDelete: SetNull)
+  client_id     Int?
+  client        Client?  @relation(fields: [client_id], references: [id], onDelete: SetNull)
+  application_id Int?
+  application   Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  duration      Int?     // seconds
+  recording_url String?
+  notes         String?
+  status        IncomingCallStatus @default(INCOMING)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("incoming_calls")
+  @@index([phone])
+  @@index([crm_user_id])
+  @@index([client_id])
+  @@index([status])
+}
+
+enum IncomingCallStatus {
+  MISSED       // Пропущен
+  ANSWERED     // Принят
+  INCOMING     // Входящий (новый звонок)
+  RINGING      // Идет разговор
+}
+
+enum TransactionType {
+  INCOME    // Приход
+  EXPENSE   // Расход
+}
+
+enum TransactionStatus {
+  PENDING      // Ожидает
+  COMPLETED    // Завершена
+  CANCELLED    // Отменена
+}
+
+model Transaction {
+  id              Int      @id @default(autoincrement())
+  type            TransactionType
+  amount          Decimal  @db.Decimal(10, 2)
+  status          TransactionStatus @default(PENDING)
+  description     String?
+  client_id       Int?
+  client          Client?  @relation(fields: [client_id], references: [id], onDelete: SetNull)
+  performer_id    Int?
+  performer       Performer? @relation(fields: [performer_id], references: [id], onDelete: SetNull)
+  application_id  Int?
+  application     Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  invoice_id      Int?
+  invoice         Invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  transaction_date DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("transactions")
+  @@index([type])
+  @@index([status])
+  @@index([client_id])
+  @@index([performer_id])
+  @@index([application_id])
+}
+
+enum InvoiceStatus {
+  DRAFT        // Черновик
+  SENT         // Отправлен
+  PAID         // Оплачен
+  OVERDUE      // Просрочен
+  CANCELLED    // Отменён
+}
+
+model Invoice {
+  id              Int      @id @default(autoincrement())
+  number          String   @unique
+  amount          Decimal  @db.Decimal(10, 2)
+  status          InvoiceStatus @default(DRAFT)
+  client_id       Int
+  client          Client   @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  application_id  Int?
+  application     Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  issue_date      DateTime @default(now())
+  due_date        DateTime
+  paid_at         DateTime?
+  description     String?
+  items           String?  // JSON array of invoice items
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  transactions    Transaction[]
+  acts            Act[]
+
+  @@map("invoices")
+  @@index([number])
+  @@index([status])
+  @@index([client_id])
+}
+
+enum ActStatus {
+  DRAFT        // Черновик
+  SENT         // Отправлен
+  SIGNED       // Подписан
+  CANCELLED    // Отменён
+}
+
+model Act {
+  id              Int      @id @default(autoincrement())
+  number          String   @unique
+  invoice_id      Int?
+  invoice         Invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  client_id       Int
+  client          Client   @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  application_id  Int?
+  application     Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  amount          Decimal  @db.Decimal(10, 2)
+  status          ActStatus @default(DRAFT)
+  act_date        DateTime @default(now())
+  description     String?
+  items           String?  // JSON array of act items
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("acts")
+  @@index([number])
+  @@index([status])
+  @@index([client_id])
+  @@index([invoice_id])
+}
+
+model Chat {
+  id              Int      @id @default(autoincrement())
+  name            String?
+  user1_id        Int
+  user1           User     @relation("ChatUser1", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2_id        Int
+  user2           User     @relation("ChatUser2", fields: [user2_id], references: [id], onDelete: Cascade)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  messages        Message[]
+
+  @@unique([user1_id, user2_id])
+  @@map("chats")
+  @@index([user1_id])
+  @@index([user2_id])
+}
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  chat_id     Int
+  chat        Chat     @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  sender_id   Int
+  sender      User     @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  content     String
+  is_read     Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  attachments MessageAttachment[]
+  shared_entities SharedEntity[]
+
+  @@map("messages")
+  @@index([chat_id])
+  @@index([sender_id])
+}
+
+model MessageAttachment {
+  id          Int      @id @default(autoincrement())
+  message_id  Int
+  message     Message  @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  filename    String
+  original_name String
+  mime_type   String
+  size        Int
+  file_path   String
+  created_at  DateTime @default(now())
+
+  @@map("message_attachments")
+  @@index([message_id])
+}
+
+enum SharedEntityType {
+  CLIENT
+  PERFORMER
+  APPLICATION
+  INVOICE
+  ACT
+}
+
+model SharedEntity {
+  id          Int      @id @default(autoincrement())
+  message_id  Int
+  message     Message  @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  entity_type SharedEntityType
+  entity_id   Int
+  created_at  DateTime @default(now())
+
+  @@map("shared_entities")
+  @@index([message_id])
+  @@index([entity_type, entity_id])
+}
