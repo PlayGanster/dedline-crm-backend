@@ -1,4 +1,4 @@
-import { IsString, IsInt } from 'class-validator';
+import { IsString, IsInt, IsOptional } from 'class-validator';
 
 export class CreateChatDto {
   @IsInt()
@@ -8,4 +8,8 @@ export class CreateChatDto {
 export class SendMessageDto {
   @IsString()
   content: string;
+
+  @IsOptional()
+  @IsInt()
+  reply_to_id?: number;
 }

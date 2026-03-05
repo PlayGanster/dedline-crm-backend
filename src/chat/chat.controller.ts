@@ -32,9 +32,14 @@ export class ChatController {
   @Get(':chatId/messages')
   async getChatMessages(
     @Param('chatId', ParseIntPipe) chatId: number,
+    @Req() req: any,
     @Query('limit') limit?: string,
   ) {
-    return this.chatService.getChatMessages(chatId, parseInt(limit) || 50);
+    return this.chatService.getMessagesWithAttachmentsAndReadStatus(
+      chatId, 
+      parseInt(limit) || 50,
+      req.user.id
+    );
   }
 
   @Post(':chatId/messages')
@@ -43,7 +48,7 @@ export class ChatController {
     @Body() dto: SendMessageDto,
     @Req() req: any,
   ) {
-    return this.chatService.sendMessage(chatId, req.user.id, dto.content);
+    return this.chatService.sendMessage(chatId, req.user.id, dto.content, dto.reply_to_id);
   }
 
   @Post(':chatId/messages/:messageId/attachments')

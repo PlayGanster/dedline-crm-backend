@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsBoolean, IsEnum, IsDateString } from 'class-validator';
 
 export class CreateIncomingCallDto {
   @IsString()
@@ -19,6 +19,18 @@ export class CreateIncomingCallDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  external_call_id?: string; // ID звонка из внешней телефонии (Билайн и т.д.)
+
+  @IsEnum(['INCOMING', 'RINGING', 'ANSWERED', 'MISSED'])
+  @IsOptional()
+  status?: 'INCOMING' | 'RINGING' | 'ANSWERED' | 'MISSED';
+
+  @IsDateString()
+  @IsOptional()
+  created_at?: Date; // Дата звонка (для импорта из внешних систем)
 }
 
 export class ConvertToClientDto {

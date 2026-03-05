@@ -333,6 +333,10 @@ model IncomingCall {
   recording_url String?
   notes         String?
   status        IncomingCallStatus @default(INCOMING)
+  
+  // Beeline CloudPBX integration
+  external_call_id String? @unique // ID звонка из внешней телефонии
+  
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
@@ -481,6 +485,11 @@ model Message {
   content     String
   is_read     Boolean  @default(false)
   created_at  DateTime @default(now())
+  
+  // Reply to another message
+  reply_to_id Int?
+  reply_to    Message? @relation("MessageReplies", fields: [reply_to_id], references: [id], onDelete: SetNull)
+  replies     Message[] @relation("MessageReplies")
 
   attachments MessageAttachment[]
   shared_entities SharedEntity[]

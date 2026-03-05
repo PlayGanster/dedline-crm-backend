@@ -23,6 +23,7 @@ import { GatewayModule } from './gateway/gateway.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { ErrorReportModule } from './error-report/error-report.module';
 import { LogsModule } from './logs/logs.module';
+import { BeelineModule } from './beeline/beeline.module';
 import { join } from 'path';
 
 @Module({
@@ -51,6 +52,7 @@ import { join } from 'path';
     TelegramModule,
     ErrorReportModule,
     LogsModule,
+    BeelineModule,
   ],
 })
 export class AppModule {}

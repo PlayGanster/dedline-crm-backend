@@ -82,6 +82,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
   }
 
+  // Отправка события всем подключенным клиентам
+  broadcast(event: string, data: any): void {
+    this.server.emit(event, data);
+    this.logger.log(`Broadcasted event '${event}'`);
+  }
+
   @SubscribeMessage('message')
   handleMessage(@ConnectedSocket() client: Socket, @MessageBody() data: any): void {
     this.server.emit('message', { clientId: client.id, data });

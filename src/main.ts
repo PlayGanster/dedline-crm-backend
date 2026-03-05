@@ -6,6 +6,9 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Глобальный префикс для всех API endpoints
+  app.setGlobalPrefix('api');
+
   // Увеличиваем лимит размера тела запроса до 10MB (для загрузки аватарок)
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
@@ -28,5 +31,6 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Backend running on: http://localhost:${port}`);
+  console.log(`API available at: http://localhost:${port}/api`);
 }
 bootstrap();

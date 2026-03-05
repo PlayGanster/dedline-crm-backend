@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateIncomingCallDto, ConvertToClientDto, ConvertToApplicationDto } from './dto/create-incoming-call.dto';
+import { EventsGateway } from '../gateway/events.gateway';
 
 @Injectable()
 export class IncomingCallsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(IncomingCallsService.name);
+  
+  constructor(
+    private prisma: PrismaService,
+    private eventsGateway: EventsGateway,
+  ) {}
 
   async getAllIncomingCalls() {
     return this.prisma.incomingCall.findMany({
@@ -71,18 +77,63 @@ export class IncomingCallsService {
   }
 
   async createIncomingCall(createIncomingCallDto: CreateIncomingCallDto, crmUserId: number) {
+    return this.createIncomingCallWithDate(createIncomingCallDto, crmUserId);
+  }
+
+  async createIncomingCallWithDate(createIncomingCallDto: CreateIncomingCallDto, crmUserId: number) {
+    // Проверяем, существует ли уже звонок с таким external_call_id
+    if (createIncomingCallDto.external_call_id) {
+      const existingCall = await this.prisma.incomingCall.findUnique({
+        where: { external_call_id: createIncomingCallDto.external_call_id },
+      });
+
+      if (existingCall) {
+        // Обновляем существующий звонок
+        return this.prisma.incomingCall.update({
+          where: { id: existingCall.id },
+          data: {
+            duration: createIncomingCallDto.duration,
+            status: createIncomingCallDto.status as any,
+            recording_url: createIncomingCallDto.recording_url,
+            updated_at: new Date(),
+          },
+          include: {
+            crm_user: {
+              select: { id: true, first_name: true, last_name: true, email: true, avatar: true },
+            },
+            client: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                company_name: true,
+                type: true,
+              },
+            },
+          },
+        });
+      }
+    }
+
     // Ищем клиента по телефону
     const existingClient = await this.prisma.client.findFirst({
       where: { phone: createIncomingCallDto.phone },
     });
 
+    const callData: any = {
+      ...createIncomingCallDto,
+      crm_user_id: crmUserId,
+      client_id: existingClient?.id || null,
+      status: createIncomingCallDto.status || (existingClient ? 'ANSWERED' : 'INCOMING'),
+    };
+
+    // Если передана дата звонка, используем её
+    if (createIncomingCallDto.created_at) {
+      callData.created_at = createIncomingCallDto.created_at;
+    }
+
     const call = await this.prisma.incomingCall.create({
-      data: {
-        ...createIncomingCallDto,
-        crm_user_id: crmUserId,
-        client_id: existingClient?.id || null,
-        status: existingClient ? 'ANSWERED' : 'INCOMING',
-      },
+      data: callData,
       include: {
         crm_user: {
           select: { id: true, first_name: true, last_name: true, email: true, avatar: true },
@@ -98,6 +149,11 @@ export class IncomingCallsService {
         },
       },
     });
+
+    // Отправляем WebSocket событие о новом звонке
+    this.logger.log(`📡 Broadcasting new-incoming-call event: ${JSON.stringify(call)}`);
+    this.eventsGateway.broadcast('new-incoming-call', call);
+    this.logger.log(`✅ Broadcast sent successfully`);
 
     return call;
   }
