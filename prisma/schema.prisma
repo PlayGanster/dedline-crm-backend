@@ -34,6 +34,8 @@ model User {
   chats_user1  Chat[] @relation("ChatUser1")
   chats_user2  Chat[] @relation("ChatUser2")
   messages     Message[]
+  managed_applications Application[] @relation("ApplicationManager")
+  directed_applications Application[] @relation("ApplicationDirector")
 
   @@map("users")
 }
@@ -203,6 +205,7 @@ model Performer {
   professions     PerformerProfession[]
   applications    ApplicationPerformer[]
   transactions    Transaction[]
+  requisites      PerformerRequisites[]
 
   @@map("performers")
   @@index([email])
@@ -275,6 +278,45 @@ model PerformerEncryptedData {
   @@index([fieldType])
 }
 
+enum RequisiteType {
+  CARD        // Банковская карта
+  SBP         // СБП (номер телефона)
+  REQUISITES  // Банковские реквизиты (ИП/самозанятый)
+}
+
+model PerformerRequisites {
+  id                  Int           @id @default(autoincrement())
+  performerId         Int
+  performer           Performer     @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  type                RequisiteType
+  name                String?       // Название (например, "Основной счет", "Карта Сбербанк")
+  is_default          Boolean       @default(false)
+
+  // Для CARD
+  card_number         String?       // Номер карты
+  card_holder         String?       // Владелец карты
+  bank_name           String?       // Название банка (для карты)
+
+  // Для SBP
+  sbp_phone           String?       // Номер телефона для СБП
+
+  // Для REQUISITES
+  inn                 String?       // ИНН
+  ogrnip              String?       // ОГРНИП
+  account_number      String?       // Расчетный счет
+  bik                 String?       // БИК
+  bank_name_full      String?       // Полное название банка
+  correspondent_account String?     // Корреспондентский счет
+
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  @@map("performer_requisites")
+  @@index([performerId])
+  @@index([type])
+  @@unique([inn, account_number]) // Уникальность реквизитов across all performers
+}
+
 enum ApplicationStatus {
   NEW
   IN_PROGRESS
@@ -291,6 +333,17 @@ model Application {
   status      ApplicationStatus @default(NEW)
   amount      Decimal? @db.Decimal(10, 2)
   performers_count Int @default(1)
+  city        String?
+
+  // Менеджер и директор
+  manager_id  Int?     // Менеджер заявки
+  manager     User?    @relation("ApplicationManager", fields: [manager_id], references: [id], onDelete: SetNull)
+  director_id Int?     // Главный по заявке (директор)
+  director    User?    @relation("ApplicationDirector", fields: [director_id], references: [id], onDelete: SetNull)
+
+  // Комментарий менеджера
+  manager_comment String? @db.Text
+
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
@@ -299,10 +352,104 @@ model Application {
   transactions Transaction[]
   invoices Invoice[]
   acts Act[]
+  tasks ApplicationTask[]
+  shifts ApplicationShift[]
+  documents ApplicationDocument[]
 
   @@map("applications")
   @@index([client_id])
   @@index([status])
+}
+
+model ApplicationTask {
+  id              Int      @id @default(autoincrement())
+  applicationId   Int
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Тип услуги
+  service_type    String   // cleaning, loading, construction, etc.
+
+  // Оплата
+  payment_type    String   // cashless, vat, cash, card
+
+  // Локации
+  work_location   String?  // Место проведения работ
+  meeting_point   String?  // Место сбора
+  work_front      String?  // Фронт работ
+
+  // Количество и даты
+  quantity        Int      @default(1)
+  start_date      DateTime?
+  time_from       String?  // Время начала (HH:MM)
+  time_to         String?  // Время окончания (HH:MM)
+
+  // Переработка
+  overtime        Boolean  @default(false)
+
+  // Ставки
+  rate            Decimal  @db.Decimal(10, 2)  // Ставка для исполнителя
+  payment_unit    String   // shift или hour
+  customer_price  Decimal? @db.Decimal(10, 2)  // Цена для заказчика
+  hours           Int?     // Количество часов (если payment_unit = hour)
+
+  // Статус задачи
+  status          ApplicationTaskStatus @default(IN_PROGRESS)
+
+  // Смены связанные с задачей
+  shifts          ApplicationShift[]
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("application_tasks")
+  @@index([applicationId])
+}
+
+enum ApplicationTaskStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model ApplicationShift {
+  id              Int      @id @default(autoincrement())
+  applicationId   Int
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  performer_id    Int
+  task_id         Int?     // Связь с задачей (опционально)
+  task            ApplicationTask? @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  
+  date            DateTime
+  hours           Int
+  amount          Decimal  @db.Decimal(10, 2)
+  receipt_sent    Boolean  @default(false)
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("application_shifts")
+  @@index([applicationId])
+  @@index([task_id])
+}
+
+model ApplicationDocument {
+  id              Int      @id @default(autoincrement())
+  applicationId   Int
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  filename        String
+  original_name   String
+  mime_type       String
+  size            Int
+  file_path       String
+  is_verified     Boolean  @default(false)
+  verified_at     DateTime?
+  
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("application_documents")
+  @@index([applicationId])
 }
 
 model ApplicationPerformer {

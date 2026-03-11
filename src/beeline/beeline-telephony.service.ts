@@ -294,36 +294,32 @@ export class BeelineTelephonyService {
       // Находим CRM пользователя по номеру абонента (кто принял звонок)
       const abonentInfo = call.abonent || abonent;
       const crmUserId = await this.findCrmUserByAbonent(abonentInfo);
-      
-      if (crmUserId) {
-        // Длительность в секундах (Билайн возвращает в миллисекундах)
-        const durationSeconds = call.duration ? Math.floor(call.duration / 1000) : 0;
-        
-        // Дата звонка из timestamp
-        const callDate = new Date(call.startDate || 0);
-        
-        this.logger.log(`Creating call from ${fromNumber}, date: ${callDate.toISOString()}, userId: ${crmUserId}`);
-        
-        // Создаём звонок с правильной датой
-        await this.incomingCallsService.createIncomingCallWithDate(
-          {
-            phone: fromNumber,
-            duration: durationSeconds,
-            recording_url: call.recording || call.recordingUrl || null,
-            notes: `Звонок через Билайн API. Call ID: ${callId}, Status: ${call.status}`,
-            external_call_id: callId,
-            status: this.mapBeelineStatus(call.status),
-            created_at: callDate, // Передаём дату звонка
-          },
-          crmUserId,
-        );
-        
-        // Добавляем в обработанные
-        this.processedCallIds.add(callId);
-        this.logger.log(`✅ Created incoming call from ${fromNumber}`);
-      } else {
-        this.logger.warn(`No CRM user found for abonent: ${JSON.stringify(abonentInfo)}`);
-      }
+
+      // Длительность в секундах (Билайн возвращает в миллисекундах)
+      const durationSeconds = call.duration ? Math.floor(call.duration / 1000) : 0;
+
+      // Дата звонка из timestamp
+      const callDate = new Date(call.startDate || 0);
+
+      this.logger.log(`Creating call from ${fromNumber}, date: ${callDate.toISOString()}, userId: ${crmUserId || 'unknown'}`);
+
+      // Создаём звонок с правильной датой (с пользователем или без)
+      await this.incomingCallsService.createIncomingCallWithDate(
+        {
+          phone: fromNumber,
+          duration: durationSeconds,
+          recording_url: call.recording || call.recordingUrl || null,
+          notes: `Звонок через Билайн API. Call ID: ${callId}, Status: ${call.status}`,
+          external_call_id: callId,
+          status: this.mapBeelineStatus(call.status),
+          created_at: callDate, // Передаём дату звонка
+        },
+        crmUserId, // null = неизвестный пользователь
+      );
+
+      // Добавляем в обработанные
+      this.processedCallIds.add(callId);
+      this.logger.log(`✅ Created incoming call from ${fromNumber} (user: ${crmUserId || 'unknown'})`);
     } catch (error) {
       this.logger.error(`Error processing call: ${error.message}`);
     }
@@ -482,7 +478,7 @@ export class BeelineTelephonyService {
   }
 
   /**
-   * Запуск периодического опроса API
+   * Запуск периодического опроса API (в минутах)
    */
   startPolling(intervalMinutes: number = 5): void {
     if (!this.apiKey) {
@@ -503,6 +499,30 @@ export class BeelineTelephonyService {
     this.pollingInterval = setInterval(() => {
       this.fetchCalls(intervalMinutes + 5); // Берём запас в 5 минут
     }, intervalMinutes * 60 * 1000);
+  }
+
+  /**
+   * Запуск периодического опроса API (в секундах)
+   */
+  startPollingSeconds(intervalSeconds: number = 10): void {
+    if (!this.apiKey) {
+      this.logger.warn('Cannot start polling: API key not configured');
+      return;
+    }
+
+    if (this.pollingInterval) {
+      this.stopPolling();
+    }
+
+    this.logger.log(`📞 Starting Beeline API polling every ${intervalSeconds} seconds`);
+
+    // Немедленный первый запуск
+    this.fetchCalls(1); // Берём звонки за последнюю минуту
+
+    // Затем по расписанию
+    this.pollingInterval = setInterval(() => {
+      this.fetchCalls(2); // Берём звонки за последние 2 минуты (запас на случай задержек)
+    }, intervalSeconds * 1000);
   }
 
   /**
@@ -608,9 +628,10 @@ export class BeelineTelephonyService {
 
     try {
       const url = 'https://cloudpbx.beeline.ru/apis/portal/subscription';
-      
+
       this.logger.log(`Setting up Xsi-Events subscription to: ${webhookUrl}`);
 
+      // Пробуем подписку на все номера (паттерн *)
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -619,9 +640,9 @@ export class BeelineTelephonyService {
         },
         body: JSON.stringify({
           url: webhookUrl,
-          subscriptionType: 'ABONENT',
           pattern: '*', // Подписка на всех абонентов
-          expires: 86400, // 24 часа в секундах
+          expires: 3600, // 1 час в секундах
+          subscriptionType: 'BASIC_CALL', // Тип подписки
         }),
       });
 
@@ -632,6 +653,31 @@ export class BeelineTelephonyService {
       } else {
         const errorText = await response.text();
         this.logger.error(`❌ Failed to create subscription: ${response.status} - ${errorText}`);
+        
+        // Если не получилось с *, пробуем с конкретным номером (200)
+        this.logger.log('Trying with extension 200...');
+        const response2 = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'X-MPBX-API-AUTH-TOKEN': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: webhookUrl,
+            pattern: '200',
+            expires: 3600,
+            subscriptionType: 'BASIC_CALL',
+          }),
+        });
+        
+        if (response2.ok) {
+          const data = await response2.json();
+          this.logger.log(`✅ Xsi-Events subscription created for extension 200: ${JSON.stringify(data)}`);
+          return true;
+        } else {
+          const errorText2 = await response2.text();
+          this.logger.error(`❌ Failed for extension 200: ${response2.status} - ${errorText2}`);
+        }
         return false;
       }
     } catch (error) {

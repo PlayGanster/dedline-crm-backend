@@ -1,9 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { PerformersService } from './performers.service';
 import { CreatePerformerDto } from './dto/create-performer.dto';
 import { UpdatePerformerDto } from './dto/update-performer.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { LogsService } from '../logs/logs.service';
+import { AvatarUploadService } from '../avatar-upload/avatar-upload.service';
 
 @Controller('performers')
 @UseGuards(AuthGuard('jwt'))
@@ -11,6 +15,7 @@ export class PerformersController {
   constructor(
     private performersService: PerformersService,
     private logsService: LogsService,
+    private avatarUploadService: AvatarUploadService,
   ) {}
 
   @Get()
@@ -106,5 +111,76 @@ export class PerformersController {
   @Post(':id/unverify')
   async unverifyPerformer(@Param('id', ParseIntPipe) id: number) {
     return this.performersService.updatePerformer(id, { is_verified: false } as any);
+  }
+
+  @Put(':id/avatar')
+  @UseInterceptors(FileInterceptor('avatar', {
+    storage: diskStorage({
+      destination: './uploads/avatars',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = extname(file.originalname);
+        const filename = `performer-${uniqueSuffix}${ext}`;
+        cb(null, filename);
+      },
+    }),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.match(/image\/(jpeg|jpg|png|gif|webp)/)) {
+        return cb(new Error('Только изображения (JPEG, PNG, GIF, WebP)'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  async uploadAvatar(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: any,
+    @Req() req: any,
+  ) {
+    console.log('[Performers] Upload avatar request received for performer:', id);
+    console.log('[Performers] File:', file?.filename, file?.size, file?.mimetype);
+    try {
+      // Получаем старого исполнителя
+      const oldPerformer = await this.performersService.getPerformerById(id);
+
+      // Если есть старая аватарка, удаляем её
+      if (oldPerformer?.avatar) {
+        const oldFilename = this.avatarUploadService.extractFilenameFromUrl(oldPerformer.avatar);
+        if (oldFilename) {
+          this.avatarUploadService.deleteAvatar(oldFilename);
+        }
+      }
+
+      // Сохраняем новую аватарку
+      const avatarUrl = this.avatarUploadService.getAvatarUrl(file.filename);
+
+      // Обновляем исполнителя с новым аватаром
+      const performer = await this.performersService.updatePerformer(id, { avatar: avatarUrl } as any);
+
+      await this.logsService.createLog({
+        userId: req.user.id,
+        action: 'PERFORMER_UPDATED',
+        entity: 'Performer',
+        entityId: id,
+        description: `Загружена новая аватарка для исполнителя: ${performer.last_name} ${performer.first_name}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: {
+          avatar: avatarUrl,
+          filename: file.filename,
+          size: file.size,
+        },
+      });
+
+      return {
+        message: 'Аватарка успешно загружена',
+        avatar: avatarUrl,
+      };
+    } catch (error) {
+      console.error('[Performers] Upload avatar error:', error);
+      throw error;
+    }
   }
 }

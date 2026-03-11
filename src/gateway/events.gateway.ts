@@ -33,10 +33,21 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+    // Отправляем клиенту список уже подключенных пользователей
+    const connectedUserIds = Array.from(this.userSockets.keys());
+    if (connectedUserIds.length > 0) {
+      connectedUserIds.forEach(userId => {
+        client.emit('user-connected', { userId });
+      });
+    }
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+    // Отправляем событие об отключении всем
+    if (client.data.userId) {
+      this.server.emit('user-disconnected', { userId: client.data.userId });
+    }
     // Удаляем из хранилища
     for (const [userId, socketId] of this.userSockets.entries()) {
       if (socketId === client.id) {
@@ -54,6 +65,8 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       this.userSockets.set(userId, client.id);
       client.data.userId = userId;
       this.logger.log(`User ${userId} authenticated with socket ${client.id}`);
+      // Отправляем событие о подключении всем (включая отправителя)
+      this.server.emit('user-connected', { userId });
     }
   }
 
@@ -86,6 +99,11 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   broadcast(event: string, data: any): void {
     this.server.emit(event, data);
     this.logger.log(`Broadcasted event '${event}'`);
+  }
+
+  // Получить список онлайн пользователей
+  getOnlineUserIds(): number[] {
+    return Array.from(this.userSockets.keys());
   }
 
   @SubscribeMessage('message')

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { CreatePerformerDto } from './dto/create-performer.dto';
 import { UpdatePerformerDto } from './dto/update-performer.dto';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PerformersService {
@@ -16,6 +17,7 @@ export class PerformersService {
     return this.prisma.performer.findMany({
       include: {
         professions: true,
+        requisites: true,
       },
       orderBy: { created_at: 'desc' },
     });
@@ -45,49 +47,64 @@ export class PerformersService {
       hashedPassword = await bcrypt.hash(performerData.password, 10);
     }
 
-    // Создаём исполнителя
-    const performer = await this.prisma.performer.create({
-      data: {
-        ...performerData,
-        password: hashedPassword,
-      },
-      include: {
-        professions: true,
-      },
-    });
-
-    // Сохраняем профессии
-    if (professions && professions.length > 0) {
-      await this.prisma.performerProfession.createMany({
-        data: professions.map((name) => ({
-          performerId: performer.id,
-          name,
-        })),
-      });
-    }
-
-    // Сохраняем зашифрованные паспортные данные
-    if (passport_series) {
-      await this.prisma.performerEncryptedData.create({
+    try {
+      // Создаём исполнителя
+      const performer = await this.prisma.performer.create({
         data: {
-          performerId: performer.id,
-          fieldType: 'passport_series',
-          encryptedValue: this.cryptoService.encrypt(passport_series),
+          ...performerData,
+          password: hashedPassword,
+        },
+        include: {
+          professions: true,
         },
       });
-    }
 
-    if (passport_number) {
-      await this.prisma.performerEncryptedData.create({
-        data: {
-          performerId: performer.id,
-          fieldType: 'passport_number',
-          encryptedValue: this.cryptoService.encrypt(passport_number),
-        },
-      });
-    }
+      // Сохраняем профессии
+      if (professions && professions.length > 0) {
+        await this.prisma.performerProfession.createMany({
+          data: professions.map((name) => ({
+            performerId: performer.id,
+            name,
+          })),
+        });
+      }
 
-    return this.getPerformerById(performer.id);
+      // Сохраняем зашифрованные паспортные данные
+      if (passport_series) {
+        await this.prisma.performerEncryptedData.create({
+          data: {
+            performerId: performer.id,
+            fieldType: 'passport_series',
+            encryptedValue: this.cryptoService.encrypt(passport_series),
+          },
+        });
+      }
+
+      if (passport_number) {
+        await this.prisma.performerEncryptedData.create({
+          data: {
+            performerId: performer.id,
+            fieldType: 'passport_number',
+            encryptedValue: this.cryptoService.encrypt(passport_number),
+          },
+        });
+      }
+
+      return this.getPerformerById(performer.id);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          // Unique constraint failed
+          const field = error.meta?.target ? (error.meta.target as string[])[0] : 'поле';
+          if (field === 'email') {
+            throw new ConflictException('Исполнитель с таким email уже существует');
+          } else if (field === 'phone') {
+            throw new ConflictException('Исполнитель с таким телефоном уже существует');
+          }
+        }
+      }
+      throw new BadRequestException('Не удалось создать исполнителя. Проверьте корректность данных.');
+    }
   }
 
   async updatePerformer(id: number, updatePerformerDto: UpdatePerformerDto) {

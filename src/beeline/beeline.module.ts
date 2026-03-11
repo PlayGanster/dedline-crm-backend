@@ -27,9 +27,9 @@ export class BeelineModule implements OnModuleInit, OnModuleDestroy {
     const webhookUrl = this.configService.get<string>('BEELINE_WEBHOOK_URL');
 
     if (pollingEnabled) {
-      // Запускаем опрос API каждые 5 минут
-      this.logger.log('📞 Starting Beeline API polling (every 5 minutes)...');
-      this.beelineService.startPolling(5);
+      // Запускаем опрос API каждые 10 секунд
+      this.logger.log('📞 Starting Beeline API polling (every 10 seconds)...');
+      this.beelineService.startPollingSeconds(10);
     }
 
     // Настраиваем Xsi-Events подписку если указан webhook URL

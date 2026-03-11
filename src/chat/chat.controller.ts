@@ -7,6 +7,7 @@ import { CreateChatDto, SendMessageDto } from './dto/create-chat.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { EventsGateway } from '../gateway/events.gateway';
 
 // Создаём директорию для вложений
 const attachmentsDir = join(process.cwd(), 'uploads', 'chat-attachments');
@@ -17,11 +18,20 @@ if (!existsSync(attachmentsDir)) {
 @Controller('chat')
 @UseGuards(AuthGuard('jwt'))
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private eventsGateway: EventsGateway,
+  ) {}
 
   @Get()
   async getUserChats(@Req() req: any) {
     return this.chatService.getUserChats(req.user.id);
+  }
+
+  @Get('online-users')
+  async getOnlineUsers() {
+    // Получаем список подключенных пользователей из gateway
+    return { userIds: this.eventsGateway.getOnlineUserIds() };
   }
 
   @Get('with/:userId')

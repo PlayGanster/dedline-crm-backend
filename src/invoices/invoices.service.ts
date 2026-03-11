@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { TransactionsService } from '../transactions/transactions.service';
 
 @Injectable()
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private transactionsService: TransactionsService,
+  ) {}
 
   async getAllInvoices() {
     return this.prisma.invoice.findMany({
@@ -153,12 +157,31 @@ export class InvoicesService {
   async markAsPaid(id: number) {
     const invoice = await this.getInvoiceById(id);
 
-    return this.prisma.invoice.update({
+    const updated = await this.prisma.invoice.update({
       where: { id },
       data: {
         status: 'PAID',
         paid_at: new Date(),
       },
     });
+
+    // Создаем транзакцию дохода если ещё не существует
+    const existingTransaction = await this.prisma.transaction.findFirst({
+      where: { invoice_id: id, type: 'INCOME' },
+    });
+
+    if (!existingTransaction && invoice.amount) {
+      await this.transactionsService.createTransaction({
+        type: 'INCOME',
+        amount: parseFloat(String(invoice.amount)),
+        status: 'COMPLETED',
+        description: `Оплата счёта #${invoice.number}`,
+        client_id: invoice.client_id,
+        application_id: invoice.application_id,
+        transaction_date: new Date().toISOString(),
+      });
+    }
+
+    return updated;
   }
 }

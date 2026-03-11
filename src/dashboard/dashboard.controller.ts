@@ -41,4 +41,29 @@ export class DashboardController {
   async getApplicationsByStatus() {
     return this.dashboardService.getApplicationsByStatus();
   }
+
+  @Get('revenue-chart')
+  async getRevenueChartData(@Query('period') period: 'week' | 'month' | 'year' = 'month') {
+    return this.dashboardService.getRevenueChartData(period);
+  }
+
+  @Get('client-types')
+  async getClientTypesStats() {
+    return this.dashboardService.getClientTypesStats();
+  }
+
+  @Get('top-performers')
+  async getTopPerformers(@Query('limit') limit: string = '5') {
+    return this.dashboardService.getTopPerformers(parseInt(limit));
+  }
+
+  @Get('top-clients')
+  async getTopClients(@Query('limit') limit: string = '5') {
+    return this.dashboardService.getTopClients(parseInt(limit));
+  }
+
+  @Get('monthly-stats')
+  async getMonthlyStats(@Query('months') months: string = '6') {
+    return this.dashboardService.getMonthlyStats(parseInt(months));
+  }
 }

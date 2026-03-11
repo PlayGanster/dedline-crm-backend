@@ -15,6 +15,7 @@ import { ChatModule } from './chat/chat.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PerformerNotesModule } from './performer-notes/performer-notes.module';
 import { PerformerDocumentsModule } from './performer-documents/performer-documents.module';
+import { PerformerRequisitesModule } from './performer-requisites/performer-requisites.module';
 import { ClientNotesModule } from './client-notes/client-notes.module';
 import { ClientDocumentsModule } from './client-documents/client-documents.module';
 import { CryptoModule } from './crypto/crypto.module';
@@ -45,6 +46,7 @@ import { join } from 'path';
     DashboardModule,
     PerformerNotesModule,
     PerformerDocumentsModule,
+    PerformerRequisitesModule,
     ClientNotesModule,
     ClientDocumentsModule,
     CryptoModule,
