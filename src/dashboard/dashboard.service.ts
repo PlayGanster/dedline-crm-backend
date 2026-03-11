@@ -148,8 +148,7 @@ export class DashboardService {
       include: {
         client: {
           select: {
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
           },
@@ -175,8 +174,7 @@ export class DashboardService {
       include: {
         client: {
           select: {
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
           },
@@ -210,8 +208,7 @@ export class DashboardService {
       include: {
         client: {
           select: {
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             phone: true,
@@ -380,8 +377,7 @@ export class DashboardService {
     return topClients.map((client) => ({
       id: client.id,
       type: client.type,
-      first_name: client.first_name,
-      last_name: client.last_name,
+      fio: client.fio,
       company_name: client.company_name,
       applicationsCount: client.applications.length,
       totalSpent: client.transactions.reduce((sum, t) => sum + parseFloat(t.amount.toString()), 0),

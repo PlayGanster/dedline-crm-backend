@@ -90,21 +90,17 @@ model Client {
   type            ClientType
   email           String?
   phone           String?
-  
+
   // Fields for individual (fiz. litso)
-  first_name      String?
-  last_name       String?
-  middle_name     String?
-  passport_series String?
-  passport_number String?
-  
+  fio             String?     // Полное ФИО
+
   // Fields for legal entity (yur. litso)
   company_name    String?
   inn             String?
   kpp             String?
   ogrn            String?
   legal_address   String?
-  
+
   notes           String?
   is_active       Boolean     @default(true)
   created_at      DateTime    @default(now())
@@ -196,6 +192,7 @@ model Performer {
   source          SourceType @default(CRM)
   is_verified     Boolean  @default(false)
   is_active       Boolean  @default(true)
+  city            String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
@@ -418,11 +415,12 @@ model ApplicationShift {
   performer_id    Int
   task_id         Int?     // Связь с задачей (опционально)
   task            ApplicationTask? @relation(fields: [task_id], references: [id], onDelete: SetNull)
-  
+
   date            DateTime
   hours           Int
   amount          Decimal  @db.Decimal(10, 2)
-  receipt_sent    Boolean  @default(false)
+  receipt_file    String?  // Путь к файлу чека
+  receipt_sent    Boolean  @default(false)  // Отправлен ли чек
 
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -458,6 +456,7 @@ model ApplicationPerformer {
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   performerId   Int
   performer     Performer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  requisiteId   Int?
   assigned_at   DateTime @default(now())
 
   @@unique([applicationId, performerId])

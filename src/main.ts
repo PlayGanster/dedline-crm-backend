@@ -2,12 +2,19 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Глобальный префикс для всех API endpoints
   app.setGlobalPrefix('api');
+
+  // Раздача статических файлов (аватарки, чеки, документы)
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
 
   // Увеличиваем лимит размера тела запроса до 10MB (для загрузки аватарок)
   app.use(bodyParser.json({ limit: '10mb' }));

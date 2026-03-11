@@ -42,4 +42,8 @@ export class CreatePerformerDto {
   @IsString()
   @IsOptional()
   passport_number?: string;
+
+  @IsString()
+  @IsOptional()
+  city?: string;
 }

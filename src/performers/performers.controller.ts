@@ -8,6 +8,7 @@ import { UpdatePerformerDto } from './dto/update-performer.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { LogsService } from '../logs/logs.service';
 import { AvatarUploadService } from '../avatar-upload/avatar-upload.service';
+import { PrismaService } from '../database/prisma.service';
 
 @Controller('performers')
 @UseGuards(AuthGuard('jwt'))
@@ -16,6 +17,7 @@ export class PerformersController {
     private performersService: PerformersService,
     private logsService: LogsService,
     private avatarUploadService: AvatarUploadService,
+    private prisma: PrismaService,
   ) {}
 
   @Get()
@@ -111,6 +113,17 @@ export class PerformersController {
   @Post(':id/unverify')
   async unverifyPerformer(@Param('id', ParseIntPipe) id: number) {
     return this.performersService.updatePerformer(id, { is_verified: false } as any);
+  }
+
+  @Get(':id/notes')
+  async getPerformerNotes(@Param('id', ParseIntPipe) id: number) {
+    return this.prisma.performerNote.findMany({
+      where: { performerId: id },
+      include: {
+        user: { select: { id: true, first_name: true, last_name: true, avatar: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
   }
 
   @Put(':id/avatar')

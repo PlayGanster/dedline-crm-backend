@@ -101,8 +101,9 @@ export class ApplicationsController {
   async addPerformer(
     @Param('id', ParseIntPipe) id: number,
     @Param('performerId', ParseIntPipe) performerId: number,
+    @Body() body: { requisiteId?: number },
   ) {
-    return this.applicationsService.addPerformerToApplication(id, performerId);
+    return this.applicationsService.addPerformerToApplication(id, performerId, body.requisiteId);
   }
 
   @Get(':id/performers')
@@ -177,6 +178,32 @@ export class ApplicationsController {
   @Delete(':id/shifts/:shiftId')
   async deleteShift(@Param('shiftId', ParseIntPipe) shiftId: number) {
     return this.applicationsService.deleteShift(shiftId);
+  }
+
+  @Post(':id/shifts/:shiftId/receipt')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: './uploads/receipts',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = extname(file.originalname);
+        cb(null, `receipt-${uniqueSuffix}${ext}`);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.match(/image\/(jpeg|jpg|png|gif|webp)|application\/pdf/)) {
+        return cb(new Error('Только изображения или PDF'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  async uploadReceipt(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('shiftId', ParseIntPipe) shiftId: number,
+    @UploadedFile() file: any,
+  ) {
+    return this.applicationsService.uploadReceipt(shiftId, file.filename);
   }
 
   // Документы

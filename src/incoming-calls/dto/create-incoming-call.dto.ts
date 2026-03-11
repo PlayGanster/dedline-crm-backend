@@ -36,11 +36,7 @@ export class CreateIncomingCallDto {
 export class ConvertToClientDto {
   @IsString()
   @IsOptional()
-  first_name?: string;
-
-  @IsString()
-  @IsOptional()
-  last_name?: string;
+  fio?: string;
 
   @IsString()
   @IsOptional()

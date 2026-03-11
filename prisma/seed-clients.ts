@@ -106,7 +106,7 @@ async function main() {
     const client = await prisma.client.create({
       data: clientData,
     });
-    console.log(`✅ Created individual client: ${client.last_name} ${client.first_name}`);
+    console.log(`✅ Created individual client: ${client.fio}`);
   }
 
   // Вставляем юр. лица

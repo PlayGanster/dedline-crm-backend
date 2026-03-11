@@ -12,13 +12,22 @@ export class ApplicationsService {
   ) {}
 
   async getAllApplications() {
-    return this.prisma.application.findMany({
-      include: {
+    const result = await this.prisma.application.findMany({
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        client_id: true,
+        status: true,
+        amount: true,
+        performers_count: true,
+        city: true,
+        created_at: true,
+        updated_at: true,
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
           },
@@ -36,9 +45,18 @@ export class ApplicationsService {
             },
           },
         },
+        tasks: {
+          select: {
+            id: true,
+            quantity: true,
+          },
+        },
       },
       orderBy: { created_at: 'desc' },
     });
+    
+    console.log('[Applications] First 3 applications:', result.slice(0, 3).map(a => ({ id: a.id, title: a.title, city: a.city })));
+    return result;
   }
 
   async getApplicationById(id: number) {
@@ -48,8 +66,7 @@ export class ApplicationsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,
@@ -198,7 +215,7 @@ export class ApplicationsService {
     return { message: 'Заявка успешно удалена' };
   }
 
-  async addPerformerToApplication(applicationId: number, performerId: number) {
+  async addPerformerToApplication(applicationId: number, performerId: number, requisiteId?: number) {
     const application = await this.prisma.application.findUnique({
       where: { id: applicationId },
       include: { performers: true },
@@ -207,7 +224,7 @@ export class ApplicationsService {
     // Проверяем верификацию исполнителя
     const performer = await this.prisma.performer.findUnique({
       where: { id: performerId },
-      select: { is_verified: true, is_active: true },
+      select: { is_verified: true, is_active: true, requisites: true },
     });
 
     if (!performer) {
@@ -242,10 +259,22 @@ export class ApplicationsService {
       throw new NotFoundException('Исполнитель уже добавлен в заявку');
     }
 
+    // Если есть реквизиты, проверяем что requisiteId передан и существует
+    if (performer.requisites && performer.requisites.length > 0) {
+      if (!requisiteId) {
+        throw new BadRequestException('Необходимо выбрать реквизиты исполнителя');
+      }
+      const requisiteExists = performer.requisites.some(r => r.id === requisiteId);
+      if (!requisiteExists) {
+        throw new NotFoundException('Реквизиты не найдены');
+      }
+    }
+
     return this.prisma.applicationPerformer.create({
       data: {
         applicationId,
         performerId,
+        requisiteId,
       },
       include: {
         performer: {
@@ -253,9 +282,14 @@ export class ApplicationsService {
             id: true,
             first_name: true,
             last_name: true,
+            middle_name: true,
             phone: true,
             avatar: true,
             is_verified: true,
+            is_active: true,
+            city: true,
+            professions: true,
+            requisites: true,
           },
         },
       },
@@ -284,7 +318,12 @@ export class ApplicationsService {
             last_name: true,
             middle_name: true,
             phone: true,
+            email: true,
             avatar: true,
+            city: true,
+            is_verified: true,
+            is_active: true,
+            professions: true,
             requisites: true,
           },
         },
@@ -440,7 +479,6 @@ export class ApplicationsService {
         date: new Date(shiftData.date),
         hours: shiftData.hours,
         amount: String(shiftData.amount),
-        receipt_sent: shiftData.receipt_sent || false,
       },
     });
 
@@ -451,8 +489,8 @@ export class ApplicationsService {
     });
 
     if (application && shiftData.amount) {
-      // Статус транзакции зависит от того, отправлен ли чек
-      const transactionStatus = shiftData.receipt_sent ? 'COMPLETED' : 'PENDING';
+      // Статус транзакции PENDING по умолчанию (чек можно загрузить позже)
+      const transactionStatus = 'PENDING';
 
       // Проверяем, существует ли уже транзакция для этой смены
       const existingTransaction = await this.prisma.transaction.findFirst({
@@ -508,6 +546,38 @@ export class ApplicationsService {
     return { message: 'Смена удалена' };
   }
 
+  async uploadReceipt(shiftId: number, filename: string) {
+    const shift = await this.prisma.applicationShift.findUnique({
+      where: { id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException(`Смена с ID ${shiftId} не найдена`);
+    }
+
+    // Обновляем смену с путём к чеку
+    const updatedShift = await this.prisma.applicationShift.update({
+      where: { id: shiftId },
+      data: {
+        receipt_file: `/uploads/receipts/${filename}`,
+      },
+    });
+
+    // Обновляем транзакцию на COMPLETED
+    await this.prisma.transaction.updateMany({
+      where: {
+        application_id: shift.applicationId,
+        performer_id: shift.performer_id,
+        amount: shift.amount,
+      },
+      data: {
+        status: 'COMPLETED',
+      },
+    });
+
+    return updatedShift;
+  }
+
   async updateShift(shiftId: number, updateShiftDto: any) {
     const shift = await this.prisma.applicationShift.findUnique({
       where: { id: shiftId },
@@ -551,12 +621,62 @@ export class ApplicationsService {
     });
   }
 
-  // Документы
+  // Документы (включая чеки из смен)
   async getDocuments(applicationId: number) {
-    return this.prisma.applicationDocument.findMany({
+    // Получаем обычные документы заявки
+    const applicationDocuments = await this.prisma.applicationDocument.findMany({
       where: { applicationId },
       orderBy: { created_at: 'desc' },
     });
+
+    // Получаем смены с чеками
+    const shifts = await this.prisma.applicationShift.findMany({
+      where: { applicationId },
+      include: {
+        task: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Преобразуем чеки в формат документов
+    const receiptDocuments = shifts
+      .filter(shift => shift.receipt_file)
+      .map(shift => ({
+        id: shift.id,
+        type: 'receipt' as const,
+        filename: shift.receipt_file,
+        original_name: `Чек смены #${shift.id}`,
+        mime_type: 'image/receipt',
+        size: 0,
+        file_path: shift.receipt_file,
+        is_verified: true,
+        verified_at: new Date(),
+        created_at: shift.created_at,
+        updated_at: shift.updated_at,
+        shift_id: shift.id,
+        task_id: shift.task_id,
+        performer_id: shift.performer_id,
+        date: shift.date,
+        hours: shift.hours,
+        amount: shift.amount,
+      }));
+
+    // Преобразуем обычные документы
+    const formattedDocuments = applicationDocuments.map(doc => ({
+      ...doc,
+      type: 'document' as const,
+      shift_id: null,
+      task_id: null,
+      performer_id: null,
+      date: null,
+      hours: null,
+      amount: null,
+    }));
+
+    // Объединяем и сортируем по дате
+    return [...receiptDocuments, ...formattedDocuments].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }
 
   async uploadDocument(applicationId: number, documentData: any) {

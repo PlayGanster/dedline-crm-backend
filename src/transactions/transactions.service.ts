@@ -13,8 +13,7 @@ export class TransactionsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
           },
@@ -45,8 +44,7 @@ export class TransactionsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,

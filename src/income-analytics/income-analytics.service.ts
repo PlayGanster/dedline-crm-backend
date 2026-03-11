@@ -202,8 +202,7 @@ export class IncomeAnalyticsService {
       where: { id: { in: clientIds } },
       select: {
         id: true,
-        first_name: true,
-        last_name: true,
+        fio: true,
         company_name: true,
         type: true,
       },
@@ -213,9 +212,9 @@ export class IncomeAnalyticsService {
       const client = clients.find(c => c.id === item.client_id);
       return {
         client_id: item.client_id,
-        client_name: client?.type === 'LEGAL_ENTITY' 
-          ? client?.company_name 
-          : `${client?.last_name} ${client?.first_name}`,
+        client_name: client?.type === 'LEGAL_ENTITY'
+          ? client?.company_name
+          : client?.fio,
         total_amount: parseFloat(item._sum.amount?.toString() || '0'),
         transaction_count: item._count,
       };

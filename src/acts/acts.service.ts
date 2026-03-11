@@ -13,8 +13,7 @@ export class ActsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,
@@ -45,8 +44,7 @@ export class ActsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,

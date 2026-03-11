@@ -17,23 +17,7 @@ export class CreateClientDto {
   // Для физ. лица
   @IsString()
   @IsOptional()
-  first_name?: string;
-
-  @IsString()
-  @IsOptional()
-  last_name?: string;
-
-  @IsString()
-  @IsOptional()
-  middle_name?: string;
-
-  @IsString()
-  @IsOptional()
-  passport_series?: string;
-
-  @IsString()
-  @IsOptional()
-  passport_number?: string;
+  fio?: string;
 
   // Для юр. лица
   @IsString()

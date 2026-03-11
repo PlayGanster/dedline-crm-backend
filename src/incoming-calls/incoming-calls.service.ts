@@ -21,8 +21,7 @@ export class IncomingCallsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,
@@ -51,8 +50,7 @@ export class IncomingCallsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
             email: true,
@@ -104,8 +102,7 @@ export class IncomingCallsService {
             client: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                fio: true,
                 company_name: true,
                 type: true,
               },
@@ -141,8 +138,7 @@ export class IncomingCallsService {
         client: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            fio: true,
             company_name: true,
             type: true,
           },
@@ -171,8 +167,7 @@ export class IncomingCallsService {
         type: dto.type,
         phone: call.phone,
         email: dto.email,
-        first_name: dto.first_name,
-        last_name: dto.last_name,
+        fio: dto.fio,
         company_name: dto.company_name,
         inn: dto.inn,
       },

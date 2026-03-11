@@ -43,7 +43,7 @@ export class ClientsController {
       action: 'CLIENT_CREATED',
       entity: 'Client',
       entityId: client.id,
-      description: `Создан новый клиент: ${client.type === 'INDIVIDUAL' ? `${client.last_name} ${client.first_name}` : client.company_name}`,
+      description: `Создан новый клиент: ${client.type === 'INDIVIDUAL' ? client.fio : client.company_name}`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
       metadata: {
@@ -69,7 +69,7 @@ export class ClientsController {
       action: 'CLIENT_UPDATED',
       entity: 'Client',
       entityId: id,
-      description: `Обновлены данные клиента: ${client.type === 'INDIVIDUAL' ? `${client.last_name} ${client.first_name}` : client.company_name}`,
+      description: `Обновлены данные клиента: ${client.type === 'INDIVIDUAL' ? client.fio : client.company_name}`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
       metadata: {
@@ -93,7 +93,7 @@ export class ClientsController {
       action: 'CLIENT_DELETED',
       entity: 'Client',
       entityId: id,
-      description: `Удалён клиент: ${client.type === 'INDIVIDUAL' ? `${client.last_name} ${client.first_name}` : client.company_name}`,
+      description: `Удалён клиент: ${client.type === 'INDIVIDUAL' ? client.fio : client.company_name}`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
       metadata: {
