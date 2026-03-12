@@ -680,3 +680,21 @@ model SharedEntity {
   @@index([message_id])
   @@index([entity_type, entity_id])
 }
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}

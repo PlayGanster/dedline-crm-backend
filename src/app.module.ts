@@ -26,6 +26,7 @@ import { ErrorReportModule } from './error-report/error-report.module';
 import { LogsModule } from './logs/logs.module';
 import { BeelineModule } from './beeline/beeline.module';
 import { CompanyCheckModule } from './company-check/company-check.module';
+import { TasksModule } from './tasks/tasks.module';
 import { join } from 'path';
 
 @Module({
@@ -57,6 +58,7 @@ import { join } from 'path';
     LogsModule,
     BeelineModule,
     CompanyCheckModule,
+    TasksModule,
   ],
 })
 export class AppModule {}
