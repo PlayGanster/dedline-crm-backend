@@ -119,6 +119,8 @@ model Client {
   @@index([type])
   @@index([email])
   @@index([inn])
+  @@index([is_active])
+  @@index([created_at])
 }
 
 model ClientNote {
@@ -208,6 +210,8 @@ model Performer {
   @@index([email])
   @@index([phone])
   @@index([source])
+  @@index([is_active])
+  @@index([created_at])
 }
 
 model PerformerProfession {
@@ -356,6 +360,9 @@ model Application {
   @@map("applications")
   @@index([client_id])
   @@index([status])
+  @@index([created_at])
+  @@index([status, created_at])
+  @@index([manager_id])
 }
 
 model ApplicationTask {
@@ -535,6 +542,8 @@ model Transaction {
   @@index([client_id])
   @@index([performer_id])
   @@index([application_id])
+  @@index([transaction_date])
+  @@index([type, status, transaction_date])
 }
 
 enum InvoiceStatus {
@@ -690,6 +699,9 @@ model Task {
   updated_at  DateTime @updatedAt
 
   @@map("tasks")
+  @@index([status])
+  @@index([created_at])
+  @@index([status, created_at])
 }
 
 enum TaskStatus {

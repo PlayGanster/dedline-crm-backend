@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -8,8 +8,11 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 100,
+  ) {
+    return this.tasksService.findAll(page, limit);
   }
 
   @Post()

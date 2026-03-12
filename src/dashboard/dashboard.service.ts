@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { CacheInterceptor } from '@nestjs/cache-manager';
+import { UseInterceptors } from '@nestjs/common';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
+  @UseInterceptors(CacheInterceptor)
   async getStats() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

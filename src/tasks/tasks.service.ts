@@ -7,8 +7,10 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
+  findAll(page: number = 1, limit: number = 100) {
     return this.prisma.task.findMany({
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: { created_at: 'desc' },
     });
   }

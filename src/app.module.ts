@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { CacheConfig } from './cache/cache.config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
@@ -32,6 +33,7 @@ import { join } from 'path';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    CacheConfig,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', '..', 'uploads'), serveRoot: '/uploads' }),
     DatabaseModule,
     AuthModule,
